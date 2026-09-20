@@ -4,12 +4,7 @@ import pytest
 
 from src.repositories import cerebro_repository
 
-SAMPLE_FILE = (
-    Path(__file__).parent.parent
-    / "src"
-    / "data"
-    / "US_AMAZON_cerebro_B0D9V9VVJL_2026-09-19.csv"
-)
+SAMPLE_FILE = Path(__file__).parent / "fixtures" / "cerebro_sample.csv"
 
 
 def _parse_sample():
@@ -19,7 +14,7 @@ def _parse_sample():
 def test_parse_returns_all_keyword_rows():
     rows = _parse_sample()
 
-    assert len(rows) == 122
+    assert len(rows) == 2
 
 
 def test_parse_detects_competitor_asin_columns_dynamically():

@@ -31,3 +31,10 @@ htmlcov/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Real Amazon/Helium 10 exports dropped into src/data/ for local testing —
+# these contain real account/campaign data and must never be committed.
+# The synthetic demo file is explicitly kept.
+src/data/*.csv
+src/data/*.xlsx
+!src/data/Targeting_Report_Demo_Sample.csv

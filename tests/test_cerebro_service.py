@@ -3,12 +3,7 @@ from pathlib import Path
 from src.schemas.cerebro import CerebroKeywordRow
 from src.services import cerebro_service
 
-SAMPLE_FILE = (
-    Path(__file__).parent.parent
-    / "src"
-    / "data"
-    / "US_AMAZON_cerebro_B0D9V9VVJL_2026-09-19.csv"
-)
+SAMPLE_FILE = Path(__file__).parent / "fixtures" / "cerebro_sample.csv"
 
 
 def _make_row(**overrides) -> CerebroKeywordRow:
@@ -28,10 +23,10 @@ def _make_row(**overrides) -> CerebroKeywordRow:
     return CerebroKeywordRow(**defaults)
 
 
-def test_ingest_returns_all_rows_from_real_sample():
+def test_ingest_returns_all_rows_from_sample():
     rows = cerebro_service.ingest(SAMPLE_FILE.read_bytes())
 
-    assert len(rows) == 122
+    assert len(rows) == 2
 
 
 def test_find_keyword_is_case_insensitive():

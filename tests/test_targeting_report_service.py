@@ -3,12 +3,7 @@ from pathlib import Path
 from src.schemas.targeting_report import KeywordPerformance
 from src.services import targeting_report_service
 
-SAMPLE_FILE = (
-    Path(__file__).parent.parent
-    / "src"
-    / "data"
-    / "Targeting_-_09_19_2026T17_30_32.csv"
-)
+SAMPLE_FILE = Path(__file__).parent / "fixtures" / "targeting_report_sample.csv"
 
 
 def _ingest_sample():
@@ -43,10 +38,10 @@ def _make_performance(**overrides) -> KeywordPerformance:
     return KeywordPerformance(**defaults)
 
 
-def test_ingest_returns_one_performance_row_per_real_keyword():
+def test_ingest_returns_one_performance_row_per_keyword():
     performances = _ingest_sample()
 
-    assert len(performances) == 17
+    assert len(performances) == 3
 
 
 def test_derived_metrics_for_row_with_clicks_but_no_sales():
@@ -78,11 +73,11 @@ def test_derived_metrics_for_row_with_no_clicks_at_all():
     assert row.aov is None
 
 
-def test_summarize_totals_from_real_sample():
+def test_summarize_totals_from_sample():
     performances = _ingest_sample()
     summary = targeting_report_service.summarize(performances)
 
-    # Only "wine saver" (PHRASE) has any cost in the real sample; no keyword
+    # Only "wine saver" (PHRASE) has any cost in the fixture; no keyword
     # has any sales or purchases yet.
     assert summary.total_spend == 0.65
     assert summary.total_sales == 0.0

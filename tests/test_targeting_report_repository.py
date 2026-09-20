@@ -4,12 +4,7 @@ import pytest
 
 from src.repositories import targeting_report_repository
 
-SAMPLE_FILE = (
-    Path(__file__).parent.parent
-    / "src"
-    / "data"
-    / "Targeting_-_09_19_2026T17_30_32.csv"
-)
+SAMPLE_FILE = Path(__file__).parent / "fixtures" / "targeting_report_sample.csv"
 
 
 def _parse_sample():
@@ -19,9 +14,9 @@ def _parse_sample():
 def test_parse_skips_ad_group_subtotal_rows():
     rows = _parse_sample()
 
-    # The raw export has 19 data rows, 2 of which are ad-group subtotal
-    # rows with a blank "Targeting" value rather than real keyword targets.
-    assert len(rows) == 17
+    # The fixture has 4 data rows, 1 of which is an ad-group subtotal row
+    # with a blank "Targeting" value rather than a real keyword target.
+    assert len(rows) == 3
     assert all(row.keyword for row in rows)
 
 
@@ -37,8 +32,8 @@ def test_parse_reads_known_row_values():
     rows = _parse_sample()
     row = next(r for r in rows if r.keyword == "wine saver" and r.match_type == "PHRASE")
 
-    assert row.campaign_name == "VELIO | SP | MANUAL | CORE"
-    assert row.ad_group_name == "VELIO CORE KEYWORDS"
+    assert row.campaign_name == "DEMO | SP | MANUAL | CORE"
+    assert row.ad_group_name == "DEMO CORE KEYWORDS"
     assert row.bid == 0.65
     assert row.status == "ENABLED"
     assert row.impressions == 18
