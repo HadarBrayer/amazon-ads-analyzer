@@ -13,7 +13,7 @@ Python FastAPI application.
   - `routes/` — HTTP/API layer. Handles request/response only; delegates business logic to services.
   - `services/` — business logic.
   - `repositories/` — data access and external API integrations.
-  - `models/` — Pydantic/data models.
+  - `schemas/` — Pydantic data schemas.
   - `consts/` — constants and enums.
   - `data/` — local/static data.
 - `tests/` — all tests.
