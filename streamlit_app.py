@@ -2,10 +2,11 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
+from src.consts.cerebro import KNOWN_COMPETITOR_NAMES
 from src.consts.strategy import StrategyMode
 from src.schemas.strategy import StrategyParams
 from src.schemas.targeting_report import KeywordPerformance
-from src.services import insights_service, targeting_report_service
+from src.services import cerebro_service, insights_service, targeting_report_service
 
 
 def _fmt_currency(value: float | None) -> str:
@@ -140,6 +141,11 @@ def _render_insights(insights: list[str]) -> None:
         st.markdown(f"- {insight}")
 
 
+def _competitor_label(asin: str) -> str:
+    name = KNOWN_COMPETITOR_NAMES.get(asin)
+    return f"{name} ({asin})" if name else asin
+
+
 st.set_page_config(page_title="Amazon Ads Analyzer", layout="wide")
 
 with st.sidebar:
@@ -157,11 +163,34 @@ with st.sidebar:
         else StrategyMode.PROFITABILITY
     )
     st.divider()
-    uploaded_file = st.file_uploader("Upload Amazon Targeting Report (CSV)", type="csv")
+
+    st.subheader("Amazon Targeting Report")
+    st.caption(
+        "Required. From Amazon Ads → Campaign Manager → Reporting → "
+        "Sponsored Products → **Keywords** (or Targeting) report, as CSV. "
+        "Upload a fresh one each time you want updated performance numbers."
+    )
+    uploaded_file = st.file_uploader(
+        "Upload Targeting Report (CSV)", type="csv", key="targeting_report_upload"
+    )
+
+    st.divider()
+
+    st.subheader("Helium 10 Cerebro (optional)")
+    st.caption(
+        "Optional. A reverse-ASIN Cerebro export for Velio's product, as CSV. "
+        "Adds keyword rank lookup and untapped-keyword opportunities below. "
+        "This doesn't change daily — no need to re-upload it every time."
+    )
+    cerebro_file = st.file_uploader(
+        "Upload Cerebro Export (CSV)", type="csv", key="cerebro_upload"
+    )
 
 st.title("Amazon Ads Analyzer")
 
 strategy = StrategyParams(target_acos=target_acos_pct / 100, mode=strategy_mode)
+targeted_keywords: set[str] = set()
+
 calendar_insights = insights_service.calendar_insights(strategy)
 if calendar_insights:
     with st.container(border=True):
@@ -183,6 +212,7 @@ if uploaded_file is not None:
         st.stop()
 
     summary = targeting_report_service.summarize(performances)
+    targeted_keywords = {row.keyword for row in performances}
 
     with st.container(border=True):
         col1, col2, col3, col4 = st.columns(4)
@@ -228,3 +258,78 @@ if uploaded_file is not None:
         st.dataframe([_to_table_row(row) for row in performances], use_container_width=True)
 else:
     st.info("Upload a Targeting Report CSV to get started.")
+
+if cerebro_file is not None:
+    try:
+        cerebro_rows = cerebro_service.ingest(cerebro_file.getvalue())
+    except ValueError as exc:
+        st.error(str(exc))
+        st.stop()
+
+    if not cerebro_rows:
+        st.warning(
+            "No keyword rows were found in this file. Double-check it's a Helium 10 "
+            "Cerebro export."
+        )
+        st.stop()
+
+    with st.container(border=True):
+        st.subheader("Keyword Rank Lookup")
+        st.caption(
+            "Type a keyword to see where Velio's product ranks organically, next to the "
+            "tracked competitors, as of this Cerebro snapshot. Page numbers are a rough "
+            "estimate (~24 listings/page) — Amazon mixes in ads and personalizes results, "
+            "so treat it as a ballpark, not an exact spot."
+        )
+        query = st.text_input("Keyword phrase", placeholder='e.g. "wine saver"')
+        if query:
+            match = cerebro_service.find_keyword(cerebro_rows, query)
+            if match is None:
+                st.warning(f"No Cerebro data for \"{query}\".")
+            elif match.position_rank is None:
+                st.info(f"Velio doesn't appear to rank organically for \"{match.keyword}\" yet.")
+            else:
+                page = cerebro_service.estimate_page(match.position_rank)
+                st.success(
+                    f"**{match.keyword}**: Velio ranks **#{match.position_rank}** "
+                    f"(roughly page {page})."
+                )
+                competitor_rows = [
+                    {"Competitor": _competitor_label(asin), "Rank": rank}
+                    for asin, rank in sorted(
+                        match.competitor_ranks.items(),
+                        key=lambda item: (item[1] is None, item[1]),
+                    )
+                ]
+                if competitor_rows:
+                    st.dataframe(competitor_rows, use_container_width=True, hide_index=True)
+
+    with st.container(border=True):
+        st.subheader("Untapped Keyword Opportunities")
+        if targeted_keywords:
+            st.caption(
+                "High-search-volume Cerebro keywords you aren't currently targeting, based "
+                "on the uploaded Targeting Report."
+            )
+        else:
+            st.caption(
+                "High-search-volume Cerebro keywords. Upload your Targeting Report too to "
+                "filter out ones you're already targeting."
+            )
+        opportunities = cerebro_service.opportunity_keywords(cerebro_rows, targeted_keywords)
+        if opportunities:
+            st.dataframe(
+                [
+                    {
+                        "Keyword": row.keyword,
+                        "Search Volume": row.search_volume,
+                        "Suggested Bid": _fmt_currency(row.suggested_bid),
+                        "Competing Products": row.competing_products,
+                    }
+                    for row in opportunities
+                ],
+                use_container_width=True,
+                hide_index=True,
+            )
+        else:
+            st.caption("No untapped keywords found — everything in Cerebro is already targeted.")
